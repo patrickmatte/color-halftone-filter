@@ -1,0 +1,234 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Halftone screen filter</title>
+<style>
+body {
+	margin: 0px;
+	font-family:Helvetica, Arial, sans-serif;
+	font-size:12px;
+}
+
+input {
+	font-size:12px;
+}
+
+#container {
+	position: relative;
+	background-color:#e3ddd8;
+}
+
+#canvas {
+	position:absolute;
+	top:10px;
+	left:10px;
+}
+
+#instructions {
+	position:relative;
+	width:200px;
+	text-align:center;
+	margin:0 auto;
+	background-color:#FFFFFF;
+	top:calc(50% - 30px);
+}
+
+#button {
+	width:200px;
+	overflow:hidden;
+	margin:0px;
+	padding:0px;
+}
+
+#controller {
+	display:none;
+	position:relative;
+	background-color:#ffffff;
+	padding:15px;
+	width:200px;
+	margin:0 auto;
+	text-align:center;
+	top:calc(50% - 40px);
+}
+
+#range {
+	width:200px;
+}
+	
+</style>
+<script src="js/tsunami/utils/Debug.js"></script>
+<script src="js/tsunami/geom/Rectangle.js"></script>
+<script src="js/tsunami/geom/Point.js"></script>
+<script src="js/tsunami/geom/Ratio.js"></script>
+<script src="js/tsunami/filters/Blendmode.js"></script>
+<script src="js/tsunami/filters/ColorHalftoneFilter.js"></script>
+<script>
+
+    init = function () {
+		container = document.getElementById("container");
+		this.regularBorder();
+
+		canvas = document.getElementById("canvas");
+		canvas.ondragover = this.canvasDragOver.bind(this);
+		canvas.ondragend = this.canvasDragEnd.bind(this);
+		canvas.ondrop = this.canvasDrop.bind(this);
+
+		controller = document.getElementById("controller");
+
+		this.rangeChangeMethod = this.rangeChange.bind(this);
+		
+		range = document.getElementById("range");
+		range.onmousedown = rangeMouseDown.bind(this);
+		range.onmousemove = rangeMouseMove.bind(this);
+		range.addEventListener("touchstart", rangeMouseDown.bind(this));
+		range.addEventListener("touchmove", rangeMouseMove.bind(this));
+		
+		var br = document.createElement('br');
+		controller.appendChild(br);
+
+		ppp = document.getElementById("ppp");
+		ppp.innerHTML = range.value + " pixels per point";
+
+		output = document.getElementById("output");
+
+		copy = document.createElement("canvas");
+
+		filter = new tsunami.filters.ColorHalftoneFilter();
+
+		instructions = document.getElementById("instructions");
+
+		button = document.getElementById("button");
+		button.onchange = this.buttonChange.bind(this);
+		
+		window.onresize = this.windowResize.bind(this);
+		windowResize(null);
+    }
+	
+	windowResize = function (event) {
+		var stageWidth = Math.min(1280, window.innerWidth);
+		var stageHeight = 720 * stageWidth / 1280;
+		
+		container.style.width = stageWidth + "px";
+		container.style.height = stageHeight + "px";
+		
+		canvas.width = stageWidth -  20;
+		canvas.height = stageHeight -  20;
+		
+		var ctx = canvas.getContext("2d");
+		ctx.fillStyle = "#ffffff";
+		ctx.fillRect(0, 0, canvas.width, canvas.height);
+		
+		copy.width = canvas.width;
+		copy.height = canvas.height;
+		
+		instructions.style.display = "block";
+		controller.style.display = "none";
+	}
+
+	regularBorder = function () {
+		container.style.backgroundColor = "#e3ddd8";
+	}
+
+	darkBorder = function () {
+		container.style.backgroundColor = "#808080";
+	}
+
+	buttonChange = function(event) {
+		var file = event.target.files[0];
+		this.readFile(file);
+	}
+
+	canvasDragOver = function(event) {
+		event.preventDefault();
+		this.darkBorder();
+	}
+
+	canvasDragEnd = function(event) {
+		event.preventDefault();
+		this.regularBorder();
+	}
+
+	canvasDrop = function(event) {
+		event.preventDefault();
+		this.regularBorder();
+
+		file = event.dataTransfer.files[0];
+		this.readFile(file);
+	}
+
+	readFile = function(file) {
+		instructions.style.display = "none";
+		controller.style.display = "block";
+
+		reader = new FileReader();
+		reader.onload = this.readerLoad.bind(this);
+		reader.readAsDataURL(file);
+	}
+
+	readerLoad = function(event) {
+		image = new Image();
+		image.onload = this.imageload.bind(this);
+		image.src = event.target.result;
+	}
+
+	imageload = function (event) {
+		var size = tsunami.geom.Ratio.scaleToFill({width:image.width, height:image.height}, {width:canvas.width, height:canvas.height});
+		var size2 = tsunami.geom.Ratio.scaleToFit({width:canvas.width, height:canvas.height}, {width:image.width, height:image.height});
+
+		var context = copy.getContext("2d");
+		context.drawImage(image, (image.width - size2.width) / 2, (image.height - size2.height) / 2, size2.width, size2.height, 0, 0, canvas.width, canvas.height);
+
+		this.applyFilter();
+	}
+
+	rangeMouseDown = function(event) {
+		output.innerHTML = "";
+		document.body.addEventListener("mouseup", this.rangeChangeMethod);
+		document.body.addEventListener("touchend", this.rangeChangeMethod);
+	}
+
+	rangeChange = function(event) {
+		document.body.removeEventListener("mouseup", this.rangeChangeMethod);
+		document.body.removeEventListener("touchend", this.rangeChangeMethod);
+		applyFilter();
+	}
+
+	rangeMouseMove = function(event) {
+		ppp.innerHTML = range.value.toString() + " pixels per point";
+	}
+
+	applyFilter = function() {
+		output.innerHTML = "Rendering filter...";
+		var context = canvas.getContext("2d");
+		context.drawImage(copy, 0, 0, canvas.width, canvas.height);
+		setTimeout(this.waitForRedraw.bind(this), 100);
+	}
+
+	waitForRedraw = function() {
+		var context = canvas.getContext("2d");
+		var time = new Date().getTime();
+		filter.pixelsPerPoint = eval(range.value);
+		filter.applyFilter(context);
+		var time2 = (new Date().getTime() - time) / 1000;
+		this.output.innerHTML = "Filter rendered in " + time2.toString() + " s";
+	}
+	
+</script>
+</head>
+<body onload="init()">
+<div id="container">
+	<canvas id="canvas"></canvas>
+	<div id="instructions">
+		Drag and drop an image here<br/>
+		or<br/>
+		<input id="button" type="file"></input>
+	</div>
+	<div id="controller">
+		<span id="ppp"></span><br/>
+		<input id="range" type="range" name="points" min="1" step="1" max="16" value="4"></input><br/>
+		<span id="output"></span>
+	</div>
+</div>
+</body>
+</html>
