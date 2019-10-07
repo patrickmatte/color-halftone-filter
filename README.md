@@ -1,6 +1,5 @@
 color-halftone-filter
 =====================
+A color halftone filter for 2D canvas.
 
-I worked on a project last year that required applying a color halftone filter to uploaded user photos. After a quick search on google, the only thing I found was a webGL shader but what I needed was a filter for 2D canvas, even if it would be performing much slower. So I finally had to write the filter myself.
-
-Please remember that the smaller the dots, the longer it will take to render.
+The smaller the dots, the longer it takes to render. You should consider using WebGL!
